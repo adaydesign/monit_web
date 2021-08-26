@@ -1,0 +1,12 @@
+[
+    {
+        "id": 1,
+        "name": "group 1",
+        "url": "https://my-json-server.typicode.com/adaydesign/monit_api1/group1"
+    },
+    {
+        "id": 2,
+        "name": "group 2",
+        "url": "https://my-json-server.typicode.com/adaydesign/monit_api1/group2"
+    }
+]

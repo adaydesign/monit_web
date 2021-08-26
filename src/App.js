@@ -1,24 +1,39 @@
-import logo from './logo.svg';
-import './App.css';
+import { Button, ChakraProvider, Flex } from "@chakra-ui/react"
+import { createContext } from "@chakra-ui/react-utils"
+import { useContext, useState } from "react"
+import groups from './group.json'
 
-function App() {
+const GroupContext = createContext(1)
+
+const MonitorGroup = () => {
+  return (<></>)
+}
+
+const MonitorMenu = (item) => {
+  const [selectedGroup, setSelectedGroup] = useContext(GroupContext)
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Button variant="link" onClick={() => setSelectedGroup(item.id)}>{item.name}</Button>
+  )
+}
+const MonitorMenuBar = () => {
+  return (
+    <Flex w="full">
+      {
+        groups.map(i => <MonitorMenu item={i} />)
+      }
+    </Flex>
+  )
+}
+const App = () => {
+  const [selectedGroup, setSelectedGroup] = useState(1)
+
+  return (
+    <ChakraProvider>
+      <GroupContext.Provider value={[selectedGroup, setSelectedGroup]}>
+        <>
+        </>
+      </GroupContext.Provider>
+    </ChakraProvider>
   );
 }
 
