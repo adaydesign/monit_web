@@ -24,7 +24,7 @@ const MonitorItem = ({ item }) => {
       case 2: return "red.500" // offline
       default: return "gray.500"
     }
-  }, [item, status])
+  }, [status])
 
   const collapseIn = useMemo(() => {
     //name
@@ -36,12 +36,11 @@ const MonitorItem = ({ item }) => {
       return false
     }
     return true
-  }, [filter])
+  }, [filter,status,item])
 
   const loadData = useRef()
   loadData.current = async () => {
     setStatus(0)
-    console.log('refresh connection : ' + item.url)
     try {
       const url = `${process.env.REACT_APP_API}/ping/${item.url}`
       const rs = await fetch(url)
@@ -63,22 +62,31 @@ const MonitorItem = ({ item }) => {
     loadData.current()
   }, [item])
 
+  const interval = useRef()
   useEffect(() => {
-    const interval = setInterval(() => {
+    clearInterval(interval.current)
+    
+    interval.current = setInterval(() => {
+      console.log(`refresh with : ${filter.time}`)
       loadData.current()
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    }, filter.time);
+    return () => clearInterval(interval.current);
+  }, [filter.time]);
 
   return (
-    <SlideFade in={true} offsetY="20px">
-      <Collapse in={collapseIn}>
-        <VStack spacing={2} bgColor={bgColor} p={filter.size === "normal" ? 4 : 2} borderRadius="lg" shadow="lg" onClick={() => { loadData.current() }} cursor="pointer">
-          <Text fontWeight="bold">{item.name}</Text>
-          <Text fontSize="xs" color="white.300">{item.url}</Text>
-        </VStack>
-      </Collapse>
-    </SlideFade>
+    collapseIn ?
+      <SlideFade in={true} offsetY="20px">
+        <Collapse in={collapseIn}>
+          <VStack spacing={2} bgColor={bgColor} p={filter.size === "normal" ? 4 : 2} borderRadius="lg" shadow="lg" onClick={() => { loadData.current() }} cursor="pointer">
+            <Text fontWeight="bold">{item.name}</Text>
+            <HStack>
+              {status === 0 && <CircularProgress size="20px" isIndeterminate/>}
+              <Text fontSize="xs" color="white.300">{item.url}</Text>
+            </HStack>
+          </VStack>
+        </Collapse>
+      </SlideFade>
+      : (null)
   )
 }
 
@@ -259,6 +267,9 @@ const MonitorFilterBar = () => {
               <option value={15000}>15 sec</option>
               <option value={30000}>30 sec</option>
               <option value={60000}>1 min</option>
+              <option value={300000}>5 min</option>
+              <option value={900000}>15 min</option>
+              <option value={1800000}>30 min</option>
             </Select>
           </HStack>
         </FormControl>
