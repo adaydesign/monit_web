@@ -1,81 +1,116 @@
-import { Button, ChakraProvider, CircularProgress, extendTheme, Flex, FormControl, FormLabel, Heading, HStack, Input, InputGroup, InputRightElement, Select, SimpleGrid, Spacer, Stack, StackDivider, Text, VStack } from "@chakra-ui/react"
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react"
+import {
+  Button, ChakraProvider, CircularProgress, Collapse, extendTheme, Flex, FormControl, Heading, HStack, Input,
+  InputGroup, InputRightElement, Select, SimpleGrid, SlideFade, Spacer, Stack, StackDivider, Text, VStack
+} from "@chakra-ui/react"
+import { createContext, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react"
 import { DeleteIcon } from '@chakra-ui/icons'
-import groups from './group.json'
+import GroupContext, { defaultValues, groupReducer, setData, setError, setLoading, setSelected } from "./groupContext"
 
-const GroupContext = createContext(1)
-const FilterContext = createContext({ status: "all", size: "normal", name: "" })
+const FilterContext = createContext({ status: "all", size: "normal", name: "", time: 3000 })
 
+/*
+item {
+  name: "",
+  url: "" (10.1.2.111:3000)
+}
+*/
 const MonitorItem = ({ item }) => {
   const [filter] = useContext(FilterContext)
-  return (
-    <VStack spacing={2} bgColor={item.online ? "green.500" : "red.400"} p={filter.size === "normal" ? 4 : 2} borderRadius="lg" shadow="lg">
-      <Text fontWeight="bold">{item.server}</Text>
-      <Text fontSize="xs" color="white.300">{item.end_point}</Text>
-      <Text fontSize="sm">{item.online}</Text>
-    </VStack>
-  )
-}
+  const [status, setStatus] = useState(0)
 
-const MonitorTable = () => {
-  const [selectedGroup] = useContext(GroupContext)
-  const [filter] = useContext(FilterContext)
-  const [result, setResult] = useState({
-    data: null,
-    loading: false,
-    error: null
-  })
-  const loadData = useRef()
-  const targetGroup = useMemo(() => {
-    return groups.find(i => i.id === selectedGroup)
-  }, [selectedGroup])
-
-  const displayItems = useMemo(() => {
-    if (result.data) {
-      const filterResult = result.data?.filter(i => {
-        if (i.server.includes(filter.name)) {
-          return (filter.status === "all" || (filter.status === "true" && i.online) || (filter.status === "false" && !i.online))
-        }
-        return false
-      })
-      return filterResult
+  const bgColor = useMemo(() => {
+    switch (status) {
+      case 1: return "green.500" // online
+      case 2: return "red.500" // offline
+      default: return "gray.500"
     }
-    return []
-  }, [result.data, filter])
+  }, [item, status])
 
+  const collapseIn = useMemo(() => {
+    //name
+    if (!item.name.includes(filter.name)) {
+      return false
+    }
+    //status : all 0(connecting) 1(online) 2(offline)
+    if (filter.status !== "all" && status !== parseInt(filter.status)) {
+      return false
+    }
+    return true
+  }, [filter])
+
+  const loadData = useRef()
   loadData.current = async () => {
-    if (selectedGroup > 0) {
-      setResult({
-        loading: true,
-        error: null,
-        data: null
-      })
-      try {
-        const rs = await fetch(targetGroup?.url)
+    setStatus(0)
+    console.log('refresh connection : ' + item.url)
+    try {
+      const url = `${process.env.REACT_APP_API}/ping/${item.url}`
+      const rs = await fetch(url)
+      if (rs.ok) {
         const rsJson = await rs.json()
-        setResult({
-          loading: false,
-          error: null,
-          data: rsJson
-        })
-      } catch (err) {
-        setResult({
-          loading: false,
-          error: err.toString(),
-          data: null
-        })
+        if (rsJson.data) {
+          setStatus(1) // online
+        }
+      } else {
+        setStatus(2) // offline 
       }
+
+    } catch (err) {
+      setStatus(2) // offline
     }
   }
 
   useEffect(() => {
     loadData.current()
-  }, [selectedGroup])
+  }, [item])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadData.current()
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
-    <Flex w="full" p={10} direction="column" mt={{ sm: "250px", lg: "50px" }}>
-      {result.error && <ErrorMessage error={result.error} />}
-      {result.loading && <LoadingMessage />}
+    <SlideFade in={true} offsetY="20px">
+      <Collapse in={collapseIn}>
+        <VStack spacing={2} bgColor={bgColor} p={filter.size === "normal" ? 4 : 2} borderRadius="lg" shadow="lg" onClick={() => { loadData.current() }} cursor="pointer">
+          <Text fontWeight="bold">{item.name}</Text>
+          <Text fontSize="xs" color="white.300">{item.url}</Text>
+        </VStack>
+      </Collapse>
+    </SlideFade>
+  )
+}
+
+const MonitorTable = () => {
+  const [groups] = useContext(GroupContext)
+  const [filter] = useContext(FilterContext)
+  const targetGroup = useMemo(() => {
+    if (groups?.data) {
+      return groups?.data?.find(i => i.id === groups?.selected)
+    } else {
+      return []
+    }
+  }, [groups])
+
+  const displayItems = useMemo(() => {
+    if (targetGroup) {
+      // const filterResult = targetGroup?.servers?.filter(i => {
+      //   if (i.name.includes(filter.name)) {
+      //     return (filter.status === "all" || (filter.status === "true" && i.online) || (filter.status === "false" && !i.online))
+      //   }
+      //   return false
+      // })
+      // return filterResult
+      return targetGroup?.servers
+    }
+    return []
+  }, [targetGroup])
+
+  return (
+    <Flex w="full" p={10} direction="column" mt={{ sm: "200px", lg: "100px" }}>
+      {groups.error && <ErrorMessage error={groups.error} />}
+      {groups.loading && <LoadingMessage />}
       {
         displayItems && displayItems.length > 0 &&
         <SimpleGrid columns={filter.size === "normal" ? { sm: 2, lg: 4 } : { sm: 3, lg: 6 }} spacing={4} w="full">
@@ -83,36 +118,88 @@ const MonitorTable = () => {
         </SimpleGrid>
       }
       {
-        !result.loading && displayItems?.length === 0 &&
+        !groups.loading && displayItems?.length === 0 &&
         <NoContentMessage />
       }
     </Flex>
   )
+
+
 }
 
 const MonitorMenu = ({ item }) => {
-  const [selectedGroup, setSelectedGroup] = useContext(GroupContext)
-  const isSelected = item.id === selectedGroup
+  const [groups, dispatchGroups] = useContext(GroupContext)
+  const isSelected = useMemo(() => {
+    return item.id === groups?.selected
+  }, [item, groups?.selected])
   return (
-    <Button variant={isSelected ? "solid" : "link"} onClick={() => setSelectedGroup(item.id)} colorScheme={isSelected ? 'white' : 'blue'}>{item.name}</Button>
+    <Button variant={isSelected ? "solid" : "link"} onClick={() => dispatchGroups(setSelected(item.id))} colorScheme={isSelected ? 'white' : 'blue'}>{item.name}</Button>
   )
 }
 
+// load list of servers
+// 
+/*
+[  
+  {
+    "id": 1,
+    "name": "group1",
+    "servers": [
+        {
+            "name": "google",
+            "url": "www.google.com:80"
+        },
+        {
+            "name": "facebook",
+            "url": "www.facebook.com:80"
+        }
+    ]
+  },
+  ...
+]
+*/
 const MonitorMenuBar = () => {
+  const [groups, dispatchGroups] = useContext(GroupContext)
+  const loadData = useRef()
+  loadData.current = async () => {
+    try {
+      dispatchGroups(setLoading(true))
+      const url = `${process.env.REACT_APP_API}/servers`
+      const rs = await fetch(url)
+      const rsJson = await rs.json()
+      if (rsJson) {
+        dispatchGroups(setData(rsJson))
+      } else {
+        dispatchGroups(setLoading(false))
+      }
+    } catch (err) {
+      dispatchGroups(setError(err.toString()))
+    }
+  }
+
+  useEffect(() => {
+    loadData.current()
+  }, [])
 
   return (
-    <Flex w="full" backgroundColor="blue.800" px={6} py={2} justify=""
+    <Flex w="full" bgGradient="linear(#1A365D,#FF0080)" px={6} py={2}
       align="center" shadow="md" mb={2}
       position="fixed" top={0} zIndex={1}
-      direction={{ sm: "column", lg: "row" }}>
-      <Heading color="white" size="md">[M] o r n i t e r</Heading>
-      <Spacer />
-      <HStack spacing={4} divider={<StackDivider verticalAlign borderColor="blue.500" />}>
-        {
-          groups.map((i, index) => <MonitorMenu item={i} key={`menu_${index}`} />)
+      direction="column">
+      <Flex w="full" align="center" mb={1}>
+        <Heading color="white" size="md">[M] o r n i t e r v.2</Heading>
+        <Spacer />
+        {groups?.loading && <CircularProgress size="20px" mr={3} isIndeterminate color="blue.800" />}
+        {groups?.error && <Text color="white">{groups?.error}</Text>}
+        {groups?.data &&
+          <HStack spacing={4} divider={<StackDivider verticalAlign borderColor="blue.500" />}>
+            {
+              groups?.data.map((i, index) => <MonitorMenu item={i} key={`menu_${index}`} />)
+            }
+          </HStack>
         }
-      </HStack>
-      <Spacer />
+        <Spacer />
+      </Flex>
       <MonitorFilterBar />
     </Flex>
   )
@@ -124,11 +211,11 @@ const MonitorFilterBar = () => {
     setFileter({ ...filter, ...value })
   }
   return (
-    <Flex justify="center" mt={{ sm: 3, lg: 0 }}>
+    <Flex w="full" justify="center" mt={{ sm: 3, lg: 0 }} bgColor="whiteAlpha.300" p={3} borderRadius="md">
       <Stack spacing={2} w="full" direction={{ sm: "column", lg: "row" }}>
         <FormControl>
-          <HStack >
-            <FormLabel>Name</FormLabel>
+          <HStack align="center">
+            <Text>Name</Text>
             <InputGroup size="sm">
               <Input
                 pr="4.5rem"
@@ -146,21 +233,32 @@ const MonitorFilterBar = () => {
           </HStack>
         </FormControl>
         <FormControl>
-          <HStack>
-            <FormLabel >Status</FormLabel>
+          <HStack align="center">
+            <Text >Status</Text>
             <Select size="sm" value={filter?.status} onChange={(e) => setFilterHandler({ status: e.target.value })}>
               <option value="all">All</option>
-              <option value="true">Online</option>
-              <option value="false">Offline</option>
+              <option value="0">Connecting...</option>
+              <option value="1">Online</option>
+              <option value="2">Offline</option>
             </Select>
           </HStack>
         </FormControl>
         <FormControl>
-          <HStack>
-            <FormLabel >Size</FormLabel>
+          <HStack align="center">
+            <Text >Size</Text>
             <Select size="sm" value={filter?.size} onChange={(e) => setFilterHandler({ size: e.target.value })}>
               <option value="normal">Normal</option>
               <option value="small">Small</option>
+            </Select>
+          </HStack>
+        </FormControl>
+        <FormControl>
+          <HStack align="center">
+            <Text >Refresh</Text>
+            <Select size="sm" value={filter?.time} onChange={(e) => setFilterHandler({ time: e.target.value })}>
+              <option value={15000}>15 sec</option>
+              <option value={30000}>30 sec</option>
+              <option value={60000}>1 min</option>
             </Select>
           </HStack>
         </FormControl>
@@ -170,11 +268,10 @@ const MonitorFilterBar = () => {
 }
 
 const LoadingMessage = () => {
-  const [selectedGroup] = useContext(GroupContext)
   return (
     <Flex w="full" justify="center">
       <CircularProgress size="20px" mr={3} isIndeterminate color="blue.800" />
-      <Text color="blue.800" fontWeight="bold" mb={6}>L O A D I N G ... (group {selectedGroup})</Text>
+      <Text color="blue.800" fontWeight="bold" mb={6}>L O A D I N G ...</Text>
     </Flex>
   )
 }
@@ -188,11 +285,9 @@ const NoContentMessage = () => {
 }
 
 const ErrorMessage = ({ error }) => {
-  const [selectedGroup] = useContext(GroupContext)
   return (
     <Flex w="full" align="center" direction="column">
-      <Text color="red">{`Error: ${error} (group ${selectedGroup})`}</Text>
-      <Text color="red">{`[url ${groups.find(i => i.id === selectedGroup)?.url}]`}</Text>
+      <Text color="red">{`Error: ${error} (-)`}</Text>
     </Flex>
   )
 }
@@ -200,8 +295,8 @@ const ErrorMessage = ({ error }) => {
 
 
 const App = () => {
-  const [selectedGroup, setSelectedGroup] = useState(1)
-  const [filter, setFilter] = useState({ status: "all", size: "normal", name: "" })
+  const [groups, dispatchGroups] = useReducer(groupReducer, defaultValues)
+  const [filter, setFilter] = useState({ status: "all", size: "normal", name: "", time: 30000 })
   const theme = extendTheme({
     fonts: {
       body: "'IBM Plex Sans Thai', sans-serif",
@@ -212,7 +307,7 @@ const App = () => {
 
   return (
     <ChakraProvider theme={theme}>
-      <GroupContext.Provider value={[selectedGroup, setSelectedGroup]}>
+      <GroupContext.Provider value={[groups, dispatchGroups]}>
         <FilterContext.Provider value={[filter, setFilter]}>
           <Flex w="full" direction="column">
             <MonitorMenuBar />
