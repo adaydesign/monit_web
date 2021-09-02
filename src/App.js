@@ -36,7 +36,7 @@ const MonitorItem = ({ item }) => {
       return false
     }
     return true
-  }, [filter,status,item])
+  }, [filter, status, item])
 
   const loadData = useRef()
   loadData.current = async () => {
@@ -65,9 +65,9 @@ const MonitorItem = ({ item }) => {
   const interval = useRef()
   useEffect(() => {
     clearInterval(interval.current)
-    
+
     interval.current = setInterval(() => {
-      console.log(`refresh with : ${filter.time}`)
+      // console.log(`refresh with : ${filter.time}`)
       loadData.current()
     }, filter.time);
     return () => clearInterval(interval.current);
@@ -80,7 +80,7 @@ const MonitorItem = ({ item }) => {
           <VStack spacing={2} bgColor={bgColor} p={filter.size === "normal" ? 4 : 2} borderRadius="lg" shadow="lg" onClick={() => { loadData.current() }} cursor="pointer">
             <Text fontWeight="bold">{item.name}</Text>
             <HStack>
-              {status === 0 && <CircularProgress size="20px" isIndeterminate/>}
+              {status === 0 && <CircularProgress size="20px" isIndeterminate />}
               <Text fontSize="xs" color="white.300">{item.url}</Text>
             </HStack>
           </VStack>
@@ -103,13 +103,6 @@ const MonitorTable = () => {
 
   const displayItems = useMemo(() => {
     if (targetGroup) {
-      // const filterResult = targetGroup?.servers?.filter(i => {
-      //   if (i.name.includes(filter.name)) {
-      //     return (filter.status === "all" || (filter.status === "true" && i.online) || (filter.status === "false" && !i.online))
-      //   }
-      //   return false
-      // })
-      // return filterResult
       return targetGroup?.servers
     }
     return []
@@ -146,26 +139,6 @@ const MonitorMenu = ({ item }) => {
 }
 
 // load list of servers
-// 
-/*
-[  
-  {
-    "id": 1,
-    "name": "group1",
-    "servers": [
-        {
-            "name": "google",
-            "url": "www.google.com:80"
-        },
-        {
-            "name": "facebook",
-            "url": "www.facebook.com:80"
-        }
-    ]
-  },
-  ...
-]
-*/
 const MonitorMenuBar = () => {
   const [groups, dispatchGroups] = useContext(GroupContext)
   const loadData = useRef()
@@ -195,7 +168,7 @@ const MonitorMenuBar = () => {
       position="fixed" top={0} zIndex={1}
       direction="column">
       <Flex w="full" align="center" mb={1}>
-        <Heading color="white" size="md">[M] o r n i t e r v.2</Heading>
+        <Heading color="white" size="md">{process.env.REACT_APP_NAME}</Heading>
         <Spacer />
         {groups?.loading && <CircularProgress size="20px" mr={3} isIndeterminate color="blue.800" />}
         {groups?.error && <Text color="white">{groups?.error}</Text>}
